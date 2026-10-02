@@ -1,0 +1,17 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# DeepFace model weights cache (if DEEPFACE_HOME is pointed here)
+.deepface/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

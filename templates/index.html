@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Capture or Upload Image</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <style>
+    body {
+      font-family: system-ui, -apple-system;
+      /*background: linear-gradient(135deg, #FFF0DB, #FECE88);*/
+      background: #f8fafc;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin: 0;
+    }
+
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+      text-align: center;
+    }
+
+    h2 {
+      margin-bottom: 16px;
+    }
+
+    video, img {
+      width: 100%;
+      border-radius: 12px;
+      margin-bottom: 12px;
+    }
+
+    input, button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      margin-bottom: 20px;
+      border-radius: 10px;
+      border: none;
+      font-size: 16px;
+    }
+
+    button {
+      background: #DD3333;
+      color: white;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      background: #e2e8f0;
+      color: #333;
+    }
+
+    #formSection {
+      text-align: left;
+    }
+
+    #result {
+      display: none;
+    }
+
+    .separator {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: #666; /* Message color */
+}
+
+.separator::before,
+.separator::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #ccc; /* Line style */
+}
+
+.separator:not(:empty)::before {
+  margin-right: .5em; /* Space between line and message */
+}
+
+.separator:not(:empty)::after {
+  margin-left: .5em; /* Space between message and line */
+}
+  </style>
+</head>
+
+<body>
+  <div class="card">
+    <h2 id="title">📷 Self Registration</h2>
+
+
+    <!-- FORM -->
+    <div id="formSection">
+      Full Name:<br>
+      <input
+        type="text"
+        id="nameInput"
+        placeholder="Your name"
+        required
+      />
+      <br>
+
+      <video id="video" autoplay playsinline></video>
+
+      <button onclick="capturePhoto()">Take Photo</button>
+      <br>
+      <div class="separator">OR</div>
+
+      <input type="file" id="fileInput" accept="image/*" />
+
+      <button class="secondary" onclick="uploadFile()">Upload Image</button>
+
+      <p id="status"></p>
+
+      
+    </div>
+
+    <!-- RESULT -->
+    <div id="result">
+      <h3>User registered successfully!</h3>
+      <img id="resultImage" />
+    </div>
+  </div>
+
+  <canvas id="canvas" style="display:none;"></canvas>
+
+  <script>
+  const video = document.getElementById("video");
+  const canvas = document.getElementById("canvas");
+  const resultImage = document.getElementById("resultImage");
+  const status = document.getElementById("status");
+
+  const formSection = document.getElementById("formSection");
+  const resultSection = document.getElementById("result");
+
+  navigator.mediaDevices.getUserMedia({ video: true })
+    .then(stream => video.srcObject = stream)
+    .catch(() => {});
+
+  function capturePhoto() {
+    const name = document.getElementById("nameInput").value.trim();
+    if (!name) return alert("Please enter your name");
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d").drawImage(video, 0, 0);
+
+    canvas.toBlob(blob => send(blob, "camera.jpg", name), "image/jpeg");
+  }
+
+  function uploadFile() {
+    const name = document.getElementById("nameInput").value.trim();
+    const fileInput = document.getElementById("fileInput");
+
+    if (!name) return alert("Please enter your name");
+    if (!fileInput.files.length) return alert("Select an image");
+
+    send(fileInput.files[0], fileInput.files[0].name, name);
+  }
+
+  async function send(file, filename, name) {
+    const formData = new FormData();
+    formData.append("image", file, filename);
+    formData.append("name", name);
+
+    status.innerText = "Validating face...";
+
+    const res = await fetch("/upload", { method: "POST", body: formData });
+    const data = await res.json();
+
+    if (!data.success) {
+      status.innerText = "❌ " + data.reason;
+      return;
+    }
+
+    // SUCCESS
+    resultImage.src = URL.createObjectURL(file);
+    formSection.style.display = "none";
+    resultSection.style.display = "block";
+    status.innerText = "";
+  }
+</script>
+
+
+
+</body>
+</html>
+

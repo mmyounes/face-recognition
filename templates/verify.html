@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Lounge Access | Facial Recognition</title>
+    <style>
+        :root {
+            --gold: #d4af37;
+            --dark: #1a1a1a;
+            --glass: rgba(255, 255, 255, 0.1);
+            --success: #27ae60;
+            --error: #c0392b;
+        }
+
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: radial-gradient(circle at center, #2c3e50 0%, #000 100%);
+            color: white;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            text-align: center;
+            width: 90%;
+            max-width: 600px;
+            padding: 40px;
+            border-radius: 30px;
+            background: var(--glass);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+        }
+
+        h1 {
+            font-weight: 300;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+            color: var(--gold);
+        }
+
+        p {
+            opacity: 0.8;
+            margin-bottom: 30px;
+        }
+
+        .camera-box {
+            position: relative;
+            width: 320px;
+            height: 320px;
+            margin: 0 auto 30px;
+            border-radius: 50%;
+            overflow: hidden;
+            border: 4px solid var(--gold);
+            box-shadow: 0 0 30px rgba(212, 175, 55, 0.3);
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
+
+        /* Scanning Animation */
+        .scanner-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: var(--gold);
+            opacity: 0.7;
+            box-shadow: 0 0 15px var(--gold);
+            animation: scan 3s infinite ease-in-out;
+            display: none;
+        }
+
+        @keyframes scan {
+            0% {
+                top: 0;
+            }
+
+            50% {
+                top: 100%;
+            }
+
+            100% {
+                top: 0;
+            }
+        }
+
+        button {
+            background: var(--gold);
+            border: none;
+            padding: 15px 40px;
+            border-radius: 50px;
+            color: black;
+            font-weight: bold;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        #result-screen {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 100;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .status-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+        }
+
+        .success-text {
+            color: var(--success);
+        }
+
+        .error-text {
+            color: var(--error);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container" id="main-ui">
+        <h1>SKYLINE LOUNGE</h1>
+        <p>Please position your face within the circle</p>
+
+        <div class="camera-box">
+            <video id="video" autoplay playsinline></video>
+            <div class="scanner-line" id="scanner"></div>
+        </div>
+
+        <button onclick="captureAndVerify()">Verify Access</button>
+    </div>
+
+    <!-- Feedback Overlay -->
+    <div id="result-screen">
+        <div class="status-icon" id="icon"></div>
+        <h2 id="result-title"></h2>
+        <p id="result-msg" style="max-width: 400px; line-height: 1.6;"></p>
+        <button onclick="resetUI()" style="margin-top: 20px; background: white;">Return</button>
+    </div>
+
+    <canvas id="canvas" style="display:none;"></canvas>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const scanner = document.getElementById('scanner');
+        const resultScreen = document.getElementById('result-screen');
+
+        // Initialize Camera
+        async function initCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                video.srcObject = stream;
+            } catch (err) {
+                alert("Camera access denied. Please ensure permissions are granted.");
+            }
+        }
+
+        async function captureAndVerify() {
+            scanner.style.display = 'block';
+
+            // 1. Draw video frame to hidden canvas
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+
+            // 2. Convert Canvas to a Blob (Binary File)
+            canvas.toBlob(async (blob) => {
+                // 3. Create FormData and append the file
+                const formData = new FormData();
+                // The key "image" must match request.files.get("image")
+                formData.append("image", blob, "capture.jpg");
+
+                try {
+                    // 4. POST the FormData to the backend
+                    // Note: DO NOT set Content-Type header; browser does it automatically
+                    const response = await fetch('/verify', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const result = await response.json();
+                    showResult(result.success, result.reason, result.score, result.distance);
+                } catch (error) {
+                    showResult(false, "Connection error. Please contact staff.");
+                } finally {
+                    scanner.style.display = 'none';
+                }
+            }, 'image/jpeg', 1); // Use JPEG format with 100% quality
+        }
+
+
+        function showResult(isSuccess, message, score, distance) {
+            resultScreen.style.display = 'flex';
+
+            const icon = document.getElementById('icon');
+            const title = document.getElementById('result-title');
+            const msg = document.getElementById('result-msg');
+
+            if (isSuccess) {
+                icon.innerHTML = "✓";
+                icon.className = "status-icon success-text";
+                title.innerText = "Access Granted";
+                msg.innerText = message; // Display the message sent from the backend
+            } else {
+                icon.innerHTML = "✕";
+                icon.className = "status-icon error-text";
+                title.innerText = "Access Denied";
+                msg.innerText = message; // Display why it failed (e.g., "No face detected")
+            }
+
+            // Append the match score when the backend returns one
+            if (typeof score === "number") {
+                msg.innerText += `\n\nMatch score: ${score}% (cosine distance ${distance.toFixed(4)})`;
+            }
+        }
+
+
+
+
+        function resetUI() {
+            resultScreen.style.display = 'none';
+        }
+
+        initCamera();
+    </script>
+</body>
+
+</html>
